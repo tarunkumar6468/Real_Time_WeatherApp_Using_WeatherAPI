@@ -4,14 +4,17 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.annotation.SuppressLint;
 import android.os.Bundle;
-import android.os.*;
+import android.os.AsyncTask;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
 import java.io.InputStream;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -20,105 +23,140 @@ import java.net.URL;
 import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends AppCompatActivity {
-    TextView  cityName;
+    TextView cityName;
     Button Search;
     TextView show;
+    TextView rainPrediction;
     String url;
-    class getWeather extends AsyncTask<String,Void,String>{
+
+    class getWeather extends AsyncTask<String, Void, String> {
         @Override
-        public String doInBackground(String... urls){
+        public String doInBackground(String... urls) {
             StringBuilder result = new StringBuilder();
-            try{
+            try {
                 URL url = new URL(urls[0]);
                 HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
                 urlConnection.connect();
-
                 InputStream inputStream = urlConnection.getInputStream();
                 BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
                 String line = "";
-                while((line=reader.readLine())!=null){
+                while ((line = reader.readLine()) != null) {
                     result.append(line).append("\n");
                 }
                 return result.toString();
-            }catch (Exception e){
+            } catch (Exception e) {
                 e.printStackTrace();
                 return null;
             }
         }
+
         @Override
-
-        protected void onPostExecute(String result){
+        protected void onPostExecute(String result) {
             super.onPostExecute(result);
-            try{
-                JSONObject jsonObject= new JSONObject(result);
-                String weatherInfo = jsonObject.getString("main");
-                weatherInfo = weatherInfo.replace("temp","Temperature");
+            try {
+                JSONObject jsonObject = new JSONObject(result);
+                JSONObject mainObject = jsonObject.getJSONObject("main");
 
-                weatherInfo = weatherInfo.replace("feels_like","Feels Like");
+                // Convert temperatures from Kelvin to Fahrenheit and Celsius
+                double tempKelvin = mainObject.getDouble("temp");
+                double feelsLikeKelvin = mainObject.getDouble("feels_like");
+                double tempMinKelvin = mainObject.getDouble("temp_min");
+                double tempMaxKelvin = mainObject.getDouble("temp_max");
 
-                weatherInfo = weatherInfo.replace("temp_min","Temperature Min");
+                String tempFahrenheit = formatTemperature(kelvinToFahrenheit(tempKelvin));
+                String feelsLikeFahrenheit = formatTemperature(kelvinToFahrenheit(feelsLikeKelvin));
+                String tempMinFahrenheit = formatTemperature(kelvinToFahrenheit(tempMinKelvin));
+                String tempMaxFahrenheit = formatTemperature(kelvinToFahrenheit(tempMaxKelvin));
 
-                weatherInfo = weatherInfo.replace("temp_max","Temperature Max");
+                String tempCelsius = formatTemperature(kelvinToCelsius(tempKelvin));
+                String feelsLikeCelsius = formatTemperature(kelvinToCelsius(feelsLikeKelvin));
+                String tempMinCelsius = formatTemperature(kelvinToCelsius(tempMinKelvin));
+                String tempMaxCelsius = formatTemperature(kelvinToCelsius(tempMaxKelvin));
 
-                weatherInfo = weatherInfo.replace("pressure","Pressure");
+                // Check for rain
+                String rainStatus = "No rain expected";
+                int rainProbability = 0; // Default to 0% if no rain data is found
 
-                weatherInfo = weatherInfo.replace("humidity","Humidity");
+                if (jsonObject.has("rain")) {
+                    JSONObject rainObject = jsonObject.getJSONObject("rain");
+                    if (rainObject.has("1h")) {
+                        double rainVolume = rainObject.getDouble("1h");
+                        if (rainVolume > 0) {
+                            // Approximate rain probability based on rain volume
+                            rainProbability = (int) Math.min(rainVolume * 10, 100); // Just an example calculation
+                            rainStatus = "Rain is expected: " + rainProbability + "% chance";
+                        }
+                    }
+                }
 
-                weatherInfo = weatherInfo.replace("see_level","See Level");
-
-                weatherInfo = weatherInfo.replace("grnd_level","Ground Level");
-
-                weatherInfo = weatherInfo.replace("{","");
-                weatherInfo = weatherInfo.replace("}","");
-                weatherInfo = weatherInfo.replace(",","\n");
-                weatherInfo = weatherInfo.replace(":"," : ");
+                String weatherInfo = "Temperature: " + tempFahrenheit + "°F / " + tempCelsius + "°C\n" +
+                        "Feels Like: " + feelsLikeFahrenheit + "°F / " + feelsLikeCelsius + "°C\n" +
+                        "Temperature Min: " + tempMinFahrenheit + "°F / " + tempMinCelsius + "°C\n" +
+                        "Temperature Max: " + tempMaxFahrenheit + "°F / " + tempMaxCelsius + "°C\n" +
+                        "Pressure: " + mainObject.getString("pressure") + " hPa\n" +
+                        "Humidity: " + mainObject.getString("humidity") + "%";
 
                 show.setText(weatherInfo);
+                rainPrediction.setText(rainStatus);
 
-            }
-            catch (Exception e){
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
-    }
 
+        private double kelvinToFahrenheit(double kelvin) {
+            return (kelvin - 273.15) * 9 / 5 + 32;
+        }
+
+        private double kelvinToCelsius(double kelvin) {
+            return kelvin - 273.15;
+        }
+
+        private String formatTemperature(double temp) {
+            return String.format("%.0f", temp);
+        }
+    }
 
     @SuppressLint("MissingInflatedId")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Remove the action bar
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().hide();
+        }
         setContentView(R.layout.activity_main);
 
-        cityName=findViewById(R.id.cityName);
-        Search=findViewById(R.id.search);
-        show=findViewById(R.id.weather);
-         final String []temp ={""};
+        cityName = findViewById(R.id.cityName);
+        Search = findViewById(R.id.search);
+        show = findViewById(R.id.weather);
+        rainPrediction = findViewById(R.id.rainPrediction);
 
-        Search.setOnClickListener(new View.OnClickListener(){
+        cityName.setOnKeyListener(new View.OnKeyListener() {
             @Override
-            public void onClick(View v){
-                Toast.makeText(MainActivity.this,"Button Clicked",Toast.LENGTH_SHORT).show();
-                String city = cityName.getText().toString();
-                try {
-                    if (city != null) {
-                        url = "https://api.openweathermap.org/data/2.5/weather?q="+ city+"&appid=a681c4bf9dda825a594357b82253445f";
-                    }
-                    else {
-                        Toast.makeText(MainActivity.this,"Enter City",Toast.LENGTH_SHORT).show();
-                    }
-                    getWeather task = new getWeather();
-                    temp[0] = task.execute(url).get();
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (keyCode == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_DOWN) {
+                    Search.performClick();
+                    return true;
                 }
-                catch (ExecutionException e){
-                    e.printStackTrace();
-                }catch (InterruptedException e){
-                    e.printStackTrace();
-                }
-                if(temp[0]==null){
-                    show.setText("Can't able to find weather");
-                }
+                return false;
             }
         });
 
+        Search.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Toast.makeText(MainActivity.this, "Button Clicked", Toast.LENGTH_SHORT).show();
+                String city = cityName.getText().toString();
+                if (!city.isEmpty()) {
+                    url = "https://api.openweathermap.org/data/2.5/weather?q=" + city + "&appid=a681c4bf9dda825a594357b82253445f";
+                    getWeather task = new getWeather();
+                    task.execute(url);
+                } else {
+                    Toast.makeText(MainActivity.this, "Enter City", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
     }
 }
