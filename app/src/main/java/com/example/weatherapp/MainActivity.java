@@ -1,7 +1,6 @@
 package com.example.weatherapp;
 
 import androidx.appcompat.app.AppCompatActivity;
-
 import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.os.AsyncTask;
@@ -10,9 +9,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.media.MediaPlayer; // Import MediaPlayer
 
-import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.InputStream;
@@ -20,7 +18,6 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends AppCompatActivity {
     TextView cityName;
@@ -28,6 +25,7 @@ public class MainActivity extends AppCompatActivity {
     TextView show;
     TextView rainPrediction;
     String url;
+    MediaPlayer mediaPlayer; // Declare MediaPlayer
 
     class getWeather extends AsyncTask<String, Void, String> {
         @Override
@@ -75,15 +73,14 @@ public class MainActivity extends AppCompatActivity {
 
                 // Check for rain
                 String rainStatus = "No rain expected";
-                int rainProbability = 0; // Default to 0% if no rain data is found
+                int rainProbability = 0;
 
                 if (jsonObject.has("rain")) {
                     JSONObject rainObject = jsonObject.getJSONObject("rain");
                     if (rainObject.has("1h")) {
                         double rainVolume = rainObject.getDouble("1h");
                         if (rainVolume > 0) {
-                            // Approximate rain probability based on rain volume
-                            rainProbability = (int) Math.min(rainVolume * 10, 100); // Just an example calculation
+                            rainProbability = (int) Math.min(rainVolume * 10, 100);
                             rainStatus = "Rain is expected: " + rainProbability + "% chance";
                         }
                     }
@@ -133,10 +130,17 @@ public class MainActivity extends AppCompatActivity {
         show = findViewById(R.id.weather);
         rainPrediction = findViewById(R.id.rainPrediction);
 
+        // Initialize MediaPlayer with the song
+        mediaPlayer = MediaPlayer.create(this, R.raw.search_song);
+
+        // Set the song to repeat automatically
+        mediaPlayer.setLooping(true); // This makes the song repeat automatically
+
         cityName.setOnKeyListener(new View.OnKeyListener() {
             @Override
             public boolean onKey(View v, int keyCode, KeyEvent event) {
                 if (keyCode == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_DOWN) {
+                    playSong();
                     Search.performClick();
                     return true;
                 }
@@ -148,6 +152,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 Toast.makeText(MainActivity.this, "Button Clicked", Toast.LENGTH_SHORT).show();
+                playSong(); // Play song when button is clicked
                 String city = cityName.getText().toString();
                 if (!city.isEmpty()) {
                     url = "https://api.openweathermap.org/data/2.5/weather?q=" + city + "&appid=a681c4bf9dda825a594357b82253445f";
@@ -158,5 +163,20 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    private void playSong() {
+        if (mediaPlayer.isPlaying()) {
+            mediaPlayer.stop();
+            mediaPlayer.prepareAsync(); // Prepare for the next play
+        }
+        mediaPlayer.start();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Release the MediaPlayer resources when the activity is destroyed
+        mediaPlayer.release();
     }
 }
