@@ -1,7 +1,9 @@
 package com.example.weatherapp;
 
 import androidx.appcompat.app.AppCompatActivity;
+
 import android.annotation.SuppressLint;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.AsyncTask;
 import android.view.KeyEvent;
@@ -9,12 +11,11 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.media.MediaPlayer; // Import MediaPlayer
 
 import org.json.JSONObject;
 
-import java.io.InputStream;
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -25,7 +26,7 @@ public class MainActivity extends AppCompatActivity {
     TextView show;
     TextView rainPrediction;
     String url;
-    MediaPlayer mediaPlayer; // Declare MediaPlayer
+    MediaPlayer mediaPlayer;
 
     class getWeather extends AsyncTask<String, Void, String> {
         @Override
@@ -37,7 +38,7 @@ public class MainActivity extends AppCompatActivity {
                 urlConnection.connect();
                 InputStream inputStream = urlConnection.getInputStream();
                 BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-                String line = "";
+                String line;
                 while ((line = reader.readLine()) != null) {
                     result.append(line).append("\n");
                 }
@@ -55,7 +56,6 @@ public class MainActivity extends AppCompatActivity {
                 JSONObject jsonObject = new JSONObject(result);
                 JSONObject mainObject = jsonObject.getJSONObject("main");
 
-                // Convert temperatures from Kelvin to Fahrenheit and Celsius
                 double tempKelvin = mainObject.getDouble("temp");
                 double feelsLikeKelvin = mainObject.getDouble("feels_like");
                 double tempMinKelvin = mainObject.getDouble("temp_min");
@@ -71,7 +71,6 @@ public class MainActivity extends AppCompatActivity {
                 String tempMinCelsius = formatTemperature(kelvinToCelsius(tempMinKelvin));
                 String tempMaxCelsius = formatTemperature(kelvinToCelsius(tempMaxKelvin));
 
-                // Check for rain
                 String rainStatus = "No rain expected";
                 int rainProbability = 0;
 
@@ -119,7 +118,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Remove the action bar
         if (getSupportActionBar() != null) {
             getSupportActionBar().hide();
         }
@@ -130,17 +128,13 @@ public class MainActivity extends AppCompatActivity {
         show = findViewById(R.id.weather);
         rainPrediction = findViewById(R.id.rainPrediction);
 
-        // Initialize MediaPlayer with the song
-        mediaPlayer = MediaPlayer.create(this, R.raw.search_song);
-
-        // Set the song to repeat automatically
-        mediaPlayer.setLooping(true); // This makes the song repeat automatically
+        mediaPlayer = MediaPlayer.create(this, R.raw.search_song); // replace 'your_audio_file' with your actual file name
+        mediaPlayer.setLooping(true); // Auto-repeat song
 
         cityName.setOnKeyListener(new View.OnKeyListener() {
             @Override
             public boolean onKey(View v, int keyCode, KeyEvent event) {
                 if (keyCode == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_DOWN) {
-                    playSong();
                     Search.performClick();
                     return true;
                 }
@@ -151,32 +145,30 @@ public class MainActivity extends AppCompatActivity {
         Search.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Toast.makeText(MainActivity.this, "Button Clicked", Toast.LENGTH_SHORT).show();
-                playSong(); // Play song when button is clicked
                 String city = cityName.getText().toString();
                 if (!city.isEmpty()) {
+                    if (!mediaPlayer.isPlaying()) {
+                        mediaPlayer.start();
+                    }
                     url = "https://api.openweathermap.org/data/2.5/weather?q=" + city + "&appid=a681c4bf9dda825a594357b82253445f";
                     getWeather task = new getWeather();
                     task.execute(url);
                 } else {
                     Toast.makeText(MainActivity.this, "Enter City", Toast.LENGTH_SHORT).show();
+                    if (mediaPlayer.isPlaying()) {
+                        mediaPlayer.pause();
+                    }
                 }
             }
         });
     }
 
-    private void playSong() {
-        if (mediaPlayer.isPlaying()) {
-            mediaPlayer.stop();
-            mediaPlayer.prepareAsync(); // Prepare for the next play
-        }
-        mediaPlayer.start();
-    }
-
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // Release the MediaPlayer resources when the activity is destroyed
-        mediaPlayer.release();
+        if (mediaPlayer != null) {
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
     }
 }
